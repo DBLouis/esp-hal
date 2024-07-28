@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use embedded_storage::{ReadStorage, Storage};
 
 use crate::{FlashSectorBuffer, FlashStorage, FlashStorageError};
@@ -14,8 +12,7 @@ impl ReadStorage for FlashStorage {
         let mut aligned_offset = offset - data_offset;
 
         // Bypass clearing sector buffer for performance reasons
-        let mut sector_data = MaybeUninit::<FlashSectorBuffer>::uninit();
-        let sector_data = unsafe { sector_data.assume_init_mut() };
+        let mut sector_data = FlashSectorBuffer::uninit();
 
         while !bytes.is_empty() {
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as _);
@@ -26,6 +23,7 @@ impl ReadStorage for FlashStorage {
             // Read only needed data words
             self.internal_read(aligned_offset, &mut sector_data[..aligned_end])?;
 
+            let sector_data = unsafe { sector_data.assume_init_mut() };
             bytes[..len].copy_from_slice(&sector_data[data_offset as usize..][..len]);
 
             aligned_offset += Self::SECTOR_SIZE;
@@ -52,11 +50,11 @@ impl Storage for FlashStorage {
         let mut aligned_offset = offset - data_offset;
 
         // Bypass clearing sector buffer for performance reasons
-        let mut sector_data = MaybeUninit::<FlashSectorBuffer>::uninit();
-        let sector_data = unsafe { sector_data.assume_init_mut() };
+        let mut sector_data = FlashSectorBuffer::uninit();
 
         while !bytes.is_empty() {
             self.internal_read(aligned_offset, &mut sector_data[..])?;
+            let sector_data = unsafe { sector_data.assume_init_mut() };
 
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as _);
 

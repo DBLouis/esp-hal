@@ -15,12 +15,12 @@ use crate::{FlashSectorBuffer, FlashStorage, FlashStorageError};
 struct FlashWordBuffer {
     // NOTE: Ensure that no unaligned fields are added above `data` to maintain its required
     // alignment
-    data: [u8; FlashStorage::WORD_SIZE as usize],
+    data: [MaybeUninit<u8>; FlashStorage::WORD_SIZE as usize],
 }
 
 #[cfg(feature = "bytewise-read")]
 impl core::ops::Deref for FlashWordBuffer {
-    type Target = [u8; FlashStorage::WORD_SIZE as usize];
+    type Target = [MaybeUninit<u8>; FlashStorage::WORD_SIZE as usize];
 
     fn deref(&self) -> &Self::Target {
         &self.data
@@ -116,8 +116,7 @@ impl ReadNorFlash for FlashStorage {
             }
         } else {
             // Bytes buffer isn't word-aligned so we might read only via aligned buffer
-            let mut buffer = MaybeUninit::<FlashSectorBuffer>::uninit();
-            let buffer = unsafe { buffer.assume_init_mut() };
+            let mut buffer = FlashSectorBuffer::uninit();
 
             for (offset, chunk) in (offset..)
                 .step_by(Self::SECTOR_SIZE as _)
@@ -140,6 +139,8 @@ impl ReadNorFlash for FlashStorage {
 
                     self.internal_read(offset, &mut buffer[..length])?;
                 }
+
+                let buffer = unsafe { buffer.assume_init() };
 
                 // Copy to bytes buffer
                 chunk.copy_from_slice(&buffer[..chunk.len()]);
