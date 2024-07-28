@@ -102,7 +102,34 @@ impl FlashStorage {
         storage
     }
 
-    #[cfg(feature = "nor-flash")]
+    /// Read bytes from the flash storage into the provided buffer, which can be uninitialized.
+    /// The buffer must be aligned to `WORD_SIZE` and the length must be a multiple of `WORD_SIZE`.
+    pub fn read_uninit(
+        &mut self,
+        offset: u32,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), FlashStorageError> {
+        self.check_bounds(offset, bytes.len())?;
+        self.check_alignment::<{ Self::WORD_SIZE }>(offset, bytes.len())?;
+        self.internal_read(offset, bytes)
+    }
+
+    /// Read bytes from the flash storage into the provided buffer.
+    /// The buffer must be aligned to `WORD_SIZE` and the length must be a multiple of `WORD_SIZE`.
+    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), FlashStorageError> {
+        // SAFETY: Transmuting to `MaybeUninit` is safe because `bytes` is initialized.
+        let bytes = unsafe { mem::transmute(bytes) };
+        self.read_uninit(offset, bytes)
+    }
+
+    /// Write bytes to the flash storage from the provided buffer.
+    /// The buffer must be aligned to `WORD_SIZE` and the length must be a multiple of `WORD_SIZE`.
+    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), FlashStorageError> {
+        self.check_bounds(offset, bytes.len())?;
+        self.check_alignment::<{ Self::WORD_SIZE }>(offset, bytes.len())?;
+        self.internal_write(offset, bytes)
+    }
+
     #[inline(always)]
     pub(crate) fn check_alignment<const ALIGN: u32>(
         &self,
